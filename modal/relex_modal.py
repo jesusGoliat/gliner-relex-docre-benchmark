@@ -7,7 +7,10 @@ Modos:
   train_b0      B0: ajuste fino N in {10,50} x 5 subconjuntos, checkpoint/umbrales elegidos en D  -> RUNS/selection/ftB_baseline_dev_D50.json
   infer_dev     salidas crudas de B0 en D=50 de dev                                               -> RUNS/raw/ftB_dev_N*_s*.json
   infer_test    salidas crudas de B0 en test (ALLOW_TEST=1)                                       -> RUNS/raw/ftB_test_N*_s*.json
-RUNS = RELEX_RUNS_DIR (def. <repo>/runs). Los modelos viven en el volumen 'relex-outputs' (/models).
+  infer_pool    salidas crudas de B0 (N=10) sobre el pool sin etiquetar (POOL_P)                  -> RUNS/raw/pool_N10_s*_P*.json
+  train_a3      estudiantes A3 (ARM=ctrl|judge, POOL_P): N gold + pseudo-etiquetas                -> RUNS/selection/a3B{ARM}_dev_D50.json
+  infer_test_a3 estudiantes A3 en test (ARM, ALLOW_TEST=1)                                        -> RUNS/raw/a3B{ARM}_test_N10_s*.json
+RUNS = RELEX_RUNS_DIR (def. <repo>/runs). Los modelos y las pseudo-etiquetas viven en el volumen 'relex-outputs' (/models, /a3).
 GPU de inferencia: RELEX_GPU (def. A100-40GB); GPU de ajuste fino: RELEX_FT_GPU (def. H100)."""
 import os, sys, json, time
 import modal
@@ -131,8 +134,9 @@ def _require_test():
 
 @app.local_entrypoint()
 def main(mode: str):
-    from data import load_red
+    from data import load_red, load, PREP
     from relex_io import to_text, ENT_LABELS, REL_NAMES, LABEL_VARIANTS
+    P = int(os.environ.get('POOL_P', '1000'))
     if mode == 'zs_dev':
         dev = load_red('dev'); idx = _d_indices(len(dev))
         cfgs = [dict(threshold=te, adjacency_threshold=ta, relation_threshold=0.05, flat_ner=fl, batch_size=8)
@@ -166,6 +170,29 @@ def main(mode: str):
                                   f"/out/models/ftB_N{r['n']}_s{r['sub']}") for r in sel]
         for r, c in zip(sel, calls):
             _save(f"{RUNS}/raw/ftB_{split}_N{r['n']}_s{r['sub']}.json", dict(idx=idx, n=r['n'], sub=r['sub'], best=r['best'], **c.get()))
+    elif mode == 'infer_pool':
+        sel = {(r['n'], r['sub']): r for r in json.load(open(f'{RUNS}/selection/ftB_baseline_dev_D50.json'))}
+        calls = []
+        for k in range(5):
+            pool = load(os.path.join(PREP, 'redocred', f'pool_N10_s{k}_P{P}.json'))
+            cfg = dict(threshold=sel[(10, k)]['best']['ent_thr'], adjacency_threshold=0.5, relation_threshold=0.05, flat_ner=True, batch_size=8)
+            calls.append(infer_grid.spawn([to_text(d) for d in pool], ENT_LABELS, REL_NAMES, [cfg], f'/out/models/ftB_N10_s{k}'))
+        for k, c in enumerate(calls):
+            _save(f'{RUNS}/raw/pool_N10_s{k}_P{P}.json', dict(P=P, sub=k, **c.get()))
+    elif mode == 'train_a3':      # N gold + pseudo-etiquetas (ctrl: del propio extractor; judge: con el juez); misma rejilla de pasos y selección en D para ambos
+        arm = os.environ['ARM']
+        ST = [100, 200, 400, 800, 1600, 3200]
+        res = list(ft_run.starmap([(10, k, ST, f'a3B{arm}', 42, f'a3/{arm}_N10_s{k}_P{P}.json', 10) for k in range(5)], return_exceptions=True))
+        _save(f'{RUNS}/selection/a3B{arm}_dev_D50.json', [r if isinstance(r, dict) else str(r) for r in res])
+    elif mode == 'infer_test_a3':
+        _require_test()
+        arm = os.environ['ARM']; sel = json.load(open(f'{RUNS}/selection/a3B{arm}_dev_D50.json'))
+        te = load_red('test'); texts = [to_text(d) for d in te]
+        calls = [infer_grid.spawn(texts, ENT_LABELS, REL_NAMES,
+                                  [dict(threshold=r['best']['ent_thr'], adjacency_threshold=0.5, relation_threshold=0.05, flat_ner=True, batch_size=8)],
+                                  f"/out/models/a3B{arm}_N10_s{r['sub']}") for r in sel]
+        for r, c in zip(sel, calls):
+            _save(f"{RUNS}/raw/a3B{arm}_test_N10_s{r['sub']}.json", dict(idx=list(range(len(te))), n=10, sub=r['sub'], best=r['best'], **c.get()))
     else:
         raise SystemExit(f'modo desconocido: {mode}')
     print('OK', mode)

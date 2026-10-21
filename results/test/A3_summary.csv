@@ -1,0 +1,6 @@
+,f1_typed,f1_typed,ign_f1_typed,ign_f1_typed,p_typed,p_typed,r_typed,r_typed,f1_untyped,f1_untyped,f1_soft_typed,f1_soft_typed,recall_unseen,recall_unseen
+,mean,std,mean,std,mean,std,mean,std,mean,std,mean,std,mean,std
+system,,,,,,,,,,,,,,
+A3_ctrl,24.11,1.61,22.82,1.48,26.89,3.67,22.11,2.03,25.51,1.59,35.07,2.37,21.72,1.93
+A3_judge,26.53,1.54,25.15,1.3,28.6,1.22,24.96,3.09,27.92,1.72,37.89,2.05,24.62,2.98
+B0,23.62,2.01,22.36,1.88,25.93,3.03,21.75,1.43,25.16,2.0,33.94,3.1,,
