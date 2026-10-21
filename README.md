@@ -2,6 +2,8 @@
 
 Registro oficial de la evaluación: código, protocolo, métricas y resultados finales.
 
+Atribución y licencias de terceros (datos de Re-DocRED incluidos): `NOTICE.md`.
+
 ## 1. Visión general
 
 **Objetivo.** Medir la extracción de relaciones a nivel de documento de extremo a extremo (texto → entidades → relaciones) con **GLiNER-Relex** cuando solo hay **N = 10** o **N = 50** documentos de entrenamiento etiquetados, y medir el efecto de un **juez LLM** que vuelve a decidir únicamente los candidatos *dudosos* del extractor, así como el de usar ese juez para etiquetar documentos no etiquetados y reentrenar (autoentrenamiento).
@@ -169,6 +171,7 @@ Calidad de las pseudo-etiquetas del pool frente a su gold (solo análisis, nunca
 
 ```
 README.md
+NOTICE.md                    atribución y licencia de los datos de terceros incluidos
 requirements.txt             entorno local (versiones verificadas)
 data/
   download.sh                clona Re-DocRED y DocRE-StructuralConsistency en los commits evaluados
@@ -197,6 +200,7 @@ src/
   a3_pseudo.py               pseudo-etiquetas de A3-ctrl y A3 y su calidad
   analyze_a3.py              métricas de test de A3 y A3-ctrl, recall en tripletas no vistas y bootstrap
 tests/                       pruebas de equivalencia de las métricas (script oficial; Ign F1)
+artifacts/MANIFEST.csv       manifiesto (tamaño y sha256) de los artefactos que se distribuyen aparte
 results/                     RESULTADOS OFICIALES (solo lectura; el código nunca escribe aquí)
   test/                      baseline_metrics.csv (Z0, B0), J0_rows.csv, J0_counts_*.npz y baseline_counts.npz (conteos por documento),
                              A1_A2_summary.csv, A1_A2_bootstrap.csv, A3_metrics.csv, A3_summary.csv, A3_bootstrap.csv
@@ -241,4 +245,4 @@ python tests/test_eval_e2e_ign.py
 6. Control de enmascarado: `python src/run_judge.py --split test --first 100 [--mask-entities] ...`.
 7. A3 (N=10): `python src/a3_pool.py --P 1000`; `POOL_P=1000 modal run modal/relex_modal.py --mode infer_pool`; `python src/a3_pseudo.py --arm ctrl --P 1000` y `python src/a3_pseudo.py --arm judge --P 1000 --lo 0.1 --hi 0.7`; subir `runs/pseudo_labels` al volumen de Modal (`modal volume put relex-outputs runs/pseudo_labels /a3`); `ARM=ctrl POOL_P=1000 modal run modal/relex_modal.py --mode train_a3` y lo mismo con `ARM=judge`; en test (`ALLOW_TEST=1`) `ARM=ctrl|judge modal run ... --mode infer_test_a3` y `POOL_P=1000 python src/analyze_a3.py`.
 
-Entorno del juez: `set -a; source .env; set +a` (claves `DEEPINFRA_API_KEY`, `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`), `C1_MAX_USD` (tope de gasto) y `C1_DI_CONCURRENCY` (200 en las ejecuciones de test reportadas). Las salidas crudas del modelo (≈1.1 GB), la caché de respuestas del juez, las pseudo-etiquetas originales de A3 y los checkpoints entrenados no se incluyen en este repositorio; las respuestas del juez proceden de una API en vivo y pueden diferir si no se dispone de la caché.
+Entorno del juez: `set -a; source .env; set +a` (claves `DEEPINFRA_API_KEY`, `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`), `C1_MAX_USD` (tope de gasto) y `C1_DI_CONCURRENCY` (200 en las ejecuciones de test reportadas). Las salidas crudas del modelo (≈1.1 GB sin comprimir), la caché de respuestas del juez, las pseudo-etiquetas originales de A3 y los checkpoints entrenados no se incluyen en este repositorio; `artifacts/MANIFEST.csv` lista los tres primeros (12 ficheros, 178 MB) con tamaño, sha256 y ubicación de uso, y se distribuyen aparte; los checkpoints no están archivados fuera del volumen de Modal donde se entrenaron; las respuestas del juez proceden de una API en vivo y pueden diferir si no se dispone de la caché.
