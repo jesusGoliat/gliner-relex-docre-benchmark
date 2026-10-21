@@ -4,7 +4,7 @@ Entradas en RUNS/test/ (baseline_metrics.csv, J0_rows.csv, J0_counts_*.npz); esc
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np, pandas as pd
-from data import RUNS
+RUNS = os.environ.get('RELEX_RUNS_DIR', os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'runs'))   # igual que data.RUNS, sin depender de los datos externos
 
 
 def f1v(c):   # c: (B,3) sumas -> F1 (%)

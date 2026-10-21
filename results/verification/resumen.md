@@ -15,6 +15,7 @@ Entorno local: el mismo que produjo las cifras de §6 (sin `dateparser`). Los lo
 | J0 en test (`src/run_judge.py --split test`, 10 configuraciones) | salidas crudas de test + caché del juez | 0 llamadas nuevas al juez; 29 columnas de métricas por fila y conteos por documento idénticos |
 | Resumen y bootstrap de J0 (`src/analyze_test.py`) | resultados anteriores | `A1_A2_summary.csv` y `A1_A2_bootstrap.csv` idénticos byte a byte |
 | Métricas de A3 (`src/analyze_a3.py`) | salidas crudas de test de A3 | `A3_metrics.csv`, `A3_summary.csv` y `A3_bootstrap.csv` idénticos byte a byte |
+| Regeneración de las tablas de J0 sin datos externos (`tests/test_reproduce_tables.py`) | conteos y métricas de `results/test/` | `A1_A2_summary.csv` y `A1_A2_bootstrap.csv` idénticos; ejecutada también en una copia del repositorio sin `data/external` |
 | Inferencia en Modal, zero-shot (`modal/relex_modal.py --mode zs_dev`) | GPU A100 | entidades y relaciones idénticas en las 12 configuraciones |
 | Inferencia en Modal con los 10 modelos B0 (`--mode infer_dev`) | checkpoints guardados | salidas en D idénticas en los 10 modelos |
 

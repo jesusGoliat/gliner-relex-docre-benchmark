@@ -90,9 +90,9 @@ Justificación: el F1 micro y el Ign F1 son las medidas estándar de DocRE (Yao 
 | Componente | Valor |
 |---|---|
 | Análisis local / cliente del juez | Python 3.12.3; numpy 2.4.4, scipy 1.17.1, pandas 3.0.2, openai 2.41.1, modal 1.6.2, scikit-learn 1.8.0 (solo lo necesita el evaluador oficial de Re-DocRED en las pruebas) (`requirements.txt`); 4 núcleos de CPU, ≈7.6 GiB de RAM, sin GPU. En este entorno **no** estaba instalado `dateparser` |
-| Contenedor de Modal | Python 3.11 (`debian_slim`); `gliner==0.2.29`; torch 2.14.1+cu130 (sin fijar, versión registrada en la salida de las ejecuciones); `numpy<2.3`, `accelerate>=1.1.0`, `scipy`, `huggingface_hub` (sin fijar); `dateparser==1.4.3`; `transformers` según lo exige `gliner` (<5.17.0; versión exacta no registrada) |
+| Contenedor de Modal | Python 3.11.12 (`debian_slim`); versiones exactas en `requirements-modal.txt`, entre ellas `gliner==0.2.29`, `torch==2.14.1` (CUDA 13.0), `transformers==5.16.1`, `accelerate==1.15.0`, `numpy==2.2.6`, `scipy==1.17.1`, `safetensors==0.8.0`, `tokenizers==0.23.3`, `dateparser==1.4.3` (la imagen fija con `==` solo `gliner` y `dateparser`; el resto son las versiones que resolvió `pip` al construirla) |
 | GPU (Modal) | NVIDIA A100-SXM4-40GB (inferencia), NVIDIA H100 80GB HBM3 (ajuste fino) |
-| Modelo | `knowledgator/gliner-relex-large-v1.0` (Hugging Face; hash de revisión no registrado) |
+| Modelo | `knowledgator/gliner-relex-large-v1.0`, revisión `4aedc9226a5ac9e2f6b5ea3e91c1ee577c88a290` (la descargada al construir la imagen; `modal/inspect_artifacts.py` la lee de la imagen; coincide con la revisión actual de Hugging Face, sin modificaciones desde 2026-03-22) |
 | Juez | API de DeepInfra compatible con OpenAI, `openai/gpt-oss-120b`, `reasoning_effort=medium`, temperatura 0, semilla 0, `response_format=json_object`; límite de reloj de 300 s por llamada; hasta 12 reintentos con espera ante HTTP 429; hasta 200 llamadas simultáneas por proceso (`C1_DI_CONCURRENCY`) |
 | Datos | Re-DocRED, commit `ccfb54f5ddf5836027c87badda10f6dfc56efaac`; DocRE-StructuralConsistency, commit `ee9de0f8cf9f2df3b061d72e13568d6361cc8dd0` (`data/download.sh`) |
 | Fechas | todas las ejecuciones: 2026-10-20 / 2026-10-21 |
@@ -167,16 +167,29 @@ Calidad de las pseudo-etiquetas del pool frente a su gold (solo análisis, nunca
 * **Extremo de la rejilla**: para N=50/s3 el umbral de relación elegido es el mayor valor de la rejilla (0.95).
 * **Autoentrenamiento**: pseudo-etiquetas con un voto, sin rebalanceo de clases; el pool se filtra de dev/test por título y el solapamiento de tripletas se mide y reporta en lugar de filtrarse.
 
-## 8. Estructura del repositorio
+## 8. Limitaciones conocidas
+
+* **Incertidumbre.** Los intervalos de confianza (bootstrap por documento) miden solo la variabilidad por muestreo de documentos de test, condicionada a los modelos ya entrenados. No incluyen la variabilidad de volver a entrenar: con la misma semilla se observaron diferencias de hasta ≈3 F1 entre ejecuciones del ajuste fino, y no se entrenó con varias semillas. Los 5 subconjuntos comparten el mismo test.
+* **Selección con 50 documentos.** Checkpoint, umbrales, etiquetas y banda se eligieron en D (50 documentos) entre muchas configuraciones candidatas; las cifras en D son optimistas (B0 con N=10: 25.9 en D frente a 23.6 en test). Evaluar en un test independiente evita trasladar ese optimismo a las cifras finales, pero no se estudió cuánto cambiaría la configuración elegida con otros 50 documentos.
+* **Reproducibilidad del entrenamiento.** Las métricas se reproducen exactamente a partir de las salidas guardadas (`results/verification/resumen.md`), pero el ajuste fino no es reproducible al bit y no se repitió. Los checkpoints solo existen en el volumen de Modal donde se entrenaron (sus sha256 están en `artifacts/CHECKPOINTS.csv`).
+* **Control de memoria del LLM.** Se aplicó a los 100 primeros documentos de test (no una muestra aleatoria) y, para N=50, a 2 subconjuntos. Solo se enmascaran las menciones del documento evaluado; los ejemplos resueltos del prompt (tomados de los N documentos de entrenamiento) no se enmascaran. Por tanto no demuestra que el juez sea independiente del conocimiento factual previo.
+* **Autoentrenamiento (A3).** Solo N=10, un único pool de 1 000 documentos y una sola votación. El pool comparte con test el 7.3–7.9 % de las tripletas (por nombres). La ganancia de recall de A3 sobre A3-ctrl es similar en el conjunto completo (+2.85) y en las tripletas no vistas (+2.90), lo que no apunta a que se concentre en hechos repetidos, pero no se separó el F1 entre tripletas vistas y no vistas.
+* **Dependencia de la agrupación de entidades.** El F1 estricto está limitado por la correferencia por reglas: el F1 estricto de clusters de entidades en test es 72–80 % (columna `cluster_strict_f1` de `baseline_metrics.csv`).
+* **Hiperparámetros.** Tasa de aprendizaje, tamaño de lote y semilla se fijaron a priori y no se exploraron; solo se seleccionaron checkpoint y umbrales.
+* **Entorno.** Diferencia entre el entorno de selección y el de evaluación respecto a `dateparser`: ver la nota de §5.
+
+## 9. Estructura del repositorio
 
 ```
 README.md
 NOTICE.md                    atribución y licencia de los datos de terceros incluidos
 requirements.txt             entorno local (versiones verificadas)
+requirements-modal.txt       dependencias exactas del contenedor de Modal y revisión del modelo base
 data/
   download.sh                clona Re-DocRED y DocRE-StructuralConsistency en los commits evaluados
   subsets/redocred/          train_N{10,50}_s{0..4}.json — los 10 conjuntos de entrenamiento con pocos datos
 modal/relex_modal.py         funciones de Modal: inferencia, ajuste fino, selección de checkpoint/umbrales en D (modos en su docstring)
+modal/inspect_artifacts.py   registra las versiones del contenedor y el sha256 de los checkpoints del volumen de Modal
 src/
   data.py                    rutas, carga de Re-DocRED, mapas de las 96 relaciones; RUNS = directorio de salida de las ejecuciones nuevas (nunca results/)
   relex_io.py                conjuntos de etiquetas (v0, v1, v3), documento → texto, offsets token/carácter, ejemplos de entrenamiento
@@ -199,8 +212,9 @@ src/
   a3_pool.py                 pool sin etiquetar de A3 y solapamiento de tripletas con dev/test
   a3_pseudo.py               pseudo-etiquetas de A3-ctrl y A3 y su calidad
   analyze_a3.py              métricas de test de A3 y A3-ctrl, recall en tripletas no vistas y bootstrap
-tests/                       pruebas de equivalencia de las métricas (script oficial; Ign F1)
+tests/                       pruebas de equivalencia de las métricas (script oficial; Ign F1) y de regeneración de las tablas de J0
 artifacts/MANIFEST.csv       manifiesto (tamaño y sha256) de los artefactos que se distribuyen aparte
+artifacts/CHECKPOINTS.csv    sha256 de los ficheros de los 20 checkpoints entrenados (B0 y A3), que viven en el volumen de Modal
 results/                     RESULTADOS OFICIALES (solo lectura; el código nunca escribe aquí)
   test/                      baseline_metrics.csv (Z0, B0), J0_rows.csv, J0_counts_*.npz y baseline_counts.npz (conteos por documento),
                              A1_A2_summary.csv, A1_A2_bootstrap.csv, A3_metrics.csv, A3_summary.csv, A3_bootstrap.csv
@@ -211,13 +225,13 @@ results/                     RESULTADOS OFICIALES (solo lectura; el código nunc
   verification/              logs y resumen de la verificación de reproducibilidad
 ```
 
-## 9. Uso
+## 10. Uso
 
 **Verificación de reproducibilidad realizada:** `results/verification/resumen.md` (qué etapas se volvieron a ejecutar y con qué resultado).
 
 **Consultar los resultados oficiales** (sin ejecutar nada): `results/test/` (cifras finales), `results/selection/` (cómo se eligieron las configuraciones), `results/pseudo_labels/`, `results/masking_control/`, `results/robustness_dateparser/`.
 
-**Recalcular las tablas resumen de J0 a partir de los conteos por documento incluidos** (sin experimentos nuevos; no llama a ningún modelo ni API):
+**Recalcular las tablas resumen de J0 a partir de los conteos por documento incluidos** (sin experimentos nuevos; no llama a ningún modelo ni API; no necesita los datos externos). La prueba `python tests/test_reproduce_tables.py` lo hace en un directorio temporal y comprueba que el resultado es idéntico al oficial:
 
 ```bash
 pip install -r requirements.txt
@@ -254,5 +268,7 @@ sha256sum -c MANIFEST.sha256        # los 12 ficheros deben dar OK
 ```
 
 Después, en una copia del repositorio: `llm_cache.jsonl` → `runs/llm_cache.jsonl`; `tar xzf raw_outputs.tgz -C runs`; `pseudo_labels/*.json` → `runs/pseudo_labels/`.
+
+8. Registro del entorno de Modal y hashes de los checkpoints: `modal run modal/inspect_artifacts.py` (escribe `runs/environment/`).
 
 Entorno del juez: `set -a; source .env; set +a` (claves `DEEPINFRA_API_KEY`, `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`), `C1_MAX_USD` (tope de gasto) y `C1_DI_CONCURRENCY` (200 en las ejecuciones de test reportadas). Las salidas crudas del modelo (≈1.1 GB sin comprimir), la caché de respuestas del juez, las pseudo-etiquetas originales de A3 y los checkpoints entrenados no se incluyen en este repositorio; `artifacts/MANIFEST.csv` lista los tres primeros (12 ficheros, 178 MB) con tamaño, sha256 y ubicación de uso, y se distribuyen en la release [`artefactos-v1`](https://github.com/jesusGoliat/gliner-relex-docre-benchmark/releases/tag/artefactos-v1); los checkpoints no están archivados fuera del volumen de Modal donde se entrenaron; las respuestas del juez proceden de una API en vivo y pueden diferir si no se dispone de la caché.
