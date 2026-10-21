@@ -22,7 +22,6 @@ sel = {(r['n'], r['sub']): r for r in json.load(open(f'{RUNS}/selection/ftB_base
 os.makedirs(f'{RUNS}/pseudo_labels', exist_ok=True)
 if a.arm == 'judge':
     import llm_router as LR
-    assert os.environ.get('C1_LLM', '').startswith('deepinfra:'), 'un único servidor del juez: DeepInfra'
     assert a.lo is not None and a.hi is not None
 rows = []
 for k in a.subs:

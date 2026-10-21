@@ -1,5 +1,5 @@
 .env
-data/external/
+data/external
 data/subsets/redocred/pool_*.json
 runs/
 __pycache__/

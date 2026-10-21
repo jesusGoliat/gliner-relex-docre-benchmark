@@ -67,7 +67,7 @@ Los documentos pseudo-etiquetados usan las entidades predichas (relaciones expan
 * Las respuestas del juez se guardan en caché por hash del prompt. Las cifras de J0 en test se obtuvieron con la caché del conjunto completo de llamadas; las llamadas que habían fallado por límite de la API (HTTP 429) en una pasada parcial previa de la misma configuración se volvieron a emitir. La tasa mínima de respuestas válidas en las diez ejecuciones de J0 es 98.8 % (`valid_rate` en `results/test/J0_rows.csv`).
 * El juez usa la tabla dominio/rango de Menotti solo como filtro de candidatos, y sus ejemplos provienen de los N documentos de entrenamiento.
 * `adjacency_threshold` no tiene efecto en la salida de `gliner==0.2.29` en la rejilla zero-shot (puntuaciones idénticas para 0.3, 0.5 y 0.65 en `results/selection/zs_dev_D50.csv`); se fija en 0.5.
-* Las pseudo-etiquetas de A3 se generan con una sola votación (temperatura 0). El solapamiento de tripletas entre el pool y test es del 7.3–7.9 % (`results/pseudo_labels/pool_overlap.csv`); por eso se reporta además el recall sobre tripletas "no vistas" (ver §4).
+* Las pseudo-etiquetas de A3 se generan con una sola votación (temperatura 0). Las pseudo-etiquetas con juez usadas para entrenar proceden de una generación en la que algunas llamadas fallaron por límite de la API y conservaron la decisión del extractor; regenerarlas desde la caché difiere en 38 de 5 000 documentos (0.23 % de las relaciones), por lo que los ficheros originales deben conservarse (`results/verification/resumen.md`). El solapamiento de tripletas entre el pool y test es del 7.3–7.9 % (`results/pseudo_labels/pool_overlap.csv`); por eso se reporta además el recall sobre tripletas "no vistas" (ver §4).
 
 ## 4. Métricas
 
@@ -79,7 +79,7 @@ Todas las métricas de tripletas son **micro-promedios sobre el split de test** 
 * **Ign F1** (`eval_e2e.ign_e2e`): como en el script oficial de Re-DocRED, los aciertos cuya terna (nombre de mención cabeza, nombre de mención cola, relación) aparece en el **train completo** (`train_revised.json`, 3 053 documentos) se descuentan de la precisión: `P_ign = (TP − TP_train) / (#pred − TP_train + 1e-5)`; el recall no cambia; `Ign F1 = 2·P_ign·R / (P_ign + R)`.
 * **Recall sobre tripletas no vistas** (`analyze_a3.unseen_recall`, solo A3): recall sobre las tripletas gold de test cuya terna (nombre cabeza, nombre cola, relación) no aparece en las tripletas gold del pool de ese subconjunto.
 * **Métricas de entidad** (`entity_metrics`): F1 de menciones con tipo (`mention_typed_f1`), F1 estricto de clusters (`cluster_strict_f1`) y exactitud de tipo de las entidades emparejadas (`type_acc`).
-* **Verificación contra el evaluador oficial.** Con entidades gold, `eval.evaluate` reproduce `official_evaluate` del repositorio de Re-DocRED (`evaluation.py`) en F1, P, R e Ign F1; `tests/test_eval_official.py` comprueba 7 casos (gold, subconjuntos, ruido, aleatorio, duplicados, vacío; con y sin hechos de train) con tolerancia 1e-9, y `tests/test_eval_e2e_ign.py` comprueba que `ign_e2e` coincide con `eval.evaluate` cuando las entidades son gold. Ambos se ejecutaron (todos los casos pasaron) durante el desarrollo; sus salidas no se guardan en este repositorio y no se volvieron a ejecutar al prepararlo.
+* **Verificación contra el evaluador oficial.** Con entidades gold, `eval.evaluate` reproduce `official_evaluate` del repositorio de Re-DocRED (`evaluation.py`) en F1, P, R e Ign F1; `tests/test_eval_official.py` comprueba 7 casos (gold, subconjuntos, ruido, aleatorio, duplicados, vacío; con y sin hechos de train) con tolerancia 1e-9, y `tests/test_eval_e2e_ign.py` comprueba que `ign_e2e` coincide con `eval.evaluate` cuando las entidades son gold. Ambos se ejecutaron con el código de este repositorio y pasaron todos los casos (logs en `results/verification/`).
 
 Justificación: el F1 micro y el Ign F1 son las medidas estándar de DocRE (Yao et al., 2019; Tan et al., 2022); el emparejamiento de extremo a extremo y con tipo es necesario porque el extractor predice sus propias entidades, y el emparejamiento estricto con tipo evita acreditar relaciones asociadas a entidades de tipo incorrecto o con límites erróneos (la variante blanda se reporta para mostrar el efecto de los errores de límites y de agrupación).
 
@@ -204,9 +204,12 @@ results/                     RESULTADOS OFICIALES (solo lectura; el código nunc
   pseudo_labels/             solapamiento pool/dev/test y calidad de las pseudo-etiquetas (P=1 000)
   robustness_dateparser/     métricas de test recalculadas con dateparser instalado y su comparación con las oficiales (§5)
   masking_control/judge_mask.csv
+  verification/              logs y resumen de la verificación de reproducibilidad
 ```
 
 ## 9. Uso
+
+**Verificación de reproducibilidad realizada:** `results/verification/resumen.md` (qué etapas se volvieron a ejecutar y con qué resultado).
 
 **Consultar los resultados oficiales** (sin ejecutar nada): `results/test/` (cifras finales), `results/selection/` (cómo se eligieron las configuraciones), `results/pseudo_labels/`, `results/masking_control/`, `results/robustness_dateparser/`.
 
@@ -238,4 +241,4 @@ python tests/test_eval_e2e_ign.py
 6. Control de enmascarado: `python src/run_judge.py --split test --first 100 [--mask-entities] ...`.
 7. A3 (N=10): `python src/a3_pool.py --P 1000`; `POOL_P=1000 modal run modal/relex_modal.py --mode infer_pool`; `python src/a3_pseudo.py --arm ctrl --P 1000` y `python src/a3_pseudo.py --arm judge --P 1000 --lo 0.1 --hi 0.7`; subir `runs/pseudo_labels` al volumen de Modal (`modal volume put relex-outputs runs/pseudo_labels /a3`); `ARM=ctrl POOL_P=1000 modal run modal/relex_modal.py --mode train_a3` y lo mismo con `ARM=judge`; en test (`ALLOW_TEST=1`) `ARM=ctrl|judge modal run ... --mode infer_test_a3` y `POOL_P=1000 python src/analyze_a3.py`.
 
-Entorno del juez: `set -a; source .env; set +a` (claves `DEEPINFRA_API_KEY`, `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`), `C1_MAX_USD` (tope de gasto) y `C1_DI_CONCURRENCY` (200 en las ejecuciones de test reportadas). Las salidas crudas del modelo (≈1.1 GB), la caché de respuestas del juez y los checkpoints entrenados no se incluyen en este repositorio; las respuestas del juez proceden de una API en vivo y pueden diferir si no se dispone de la caché.
+Entorno del juez: `set -a; source .env; set +a` (claves `DEEPINFRA_API_KEY`, `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`), `C1_MAX_USD` (tope de gasto) y `C1_DI_CONCURRENCY` (200 en las ejecuciones de test reportadas). Las salidas crudas del modelo (≈1.1 GB), la caché de respuestas del juez, las pseudo-etiquetas originales de A3 y los checkpoints entrenados no se incluyen en este repositorio; las respuestas del juez proceden de una API en vivo y pueden diferir si no se dispone de la caché.

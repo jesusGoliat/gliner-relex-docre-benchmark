@@ -1,0 +1,9 @@
+# tests/test_eval_official.py  (2026-10-21T12:39:07-06:00)
+gold                         nuestro F1=100.000000 Ign=100.000000 | oficial F1=100.000000 Ign=100.000000 | max|d|=0.00e+00
+gold, train vacío (sin Ign)  nuestro F1=100.000000 Ign=100.000000 | oficial F1=100.000000 Ign=100.000000 | max|d|=0.00e+00
+50% gold                     nuestro F1=66.620365 Ign=66.620365 | oficial F1=66.620365 Ign=66.620365 | max|d|=0.00e+00
+gold con 30% de ruido en r   nuestro F1=70.274337 Ign=68.908706 | oficial F1=70.274337 Ign=68.908706 | max|d|=0.00e+00
+aleatorio                    nuestro F1=2.810479 Ign=2.701188 | oficial F1=2.810479 Ign=2.701188 | max|d|=0.00e+00
+duplicados                   nuestro F1=5.623032 Ign=5.623032 | oficial F1=5.623032 Ign=5.623032 | max|d|=0.00e+00
+vacío                        nuestro F1=0.000000 Ign=0.000000 | oficial F1=0.000000 Ign=0.000000 | max|d|=0.00e+00
+OK: eval.evaluate == official_evaluate en todos los casos

@@ -1,0 +1,4 @@
+# tests/test_eval_e2e_ign.py  (2026-10-21T12:39:44-06:00)
+gold: eval.evaluate Ign=100.000000 ign_e2e=100.000000
+70% + ruido: eval.evaluate Ign=76.493510 ign_e2e=76.493510
+OK
