@@ -6,3 +6,4 @@ openai==2.41.1
 modal==1.6.2
 scikit-learn==1.8.0   # solo lo importa el evaluador oficial de Re-DocRED (tests/test_eval_official.py)
 # Opcional: dateparser (ver README, "Experimental Environment"). El entorno local de análisis NO lo tenía instalado; el contenedor de Modal usa dateparser==1.4.3.
+matplotlib==3.10.9   # solo para src/make_figures.py

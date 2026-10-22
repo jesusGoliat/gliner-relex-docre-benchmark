@@ -4,6 +4,72 @@ Registro oficial de la evaluación: código, protocolo, métricas y resultados f
 
 Atribución y licencias de terceros (datos de Re-DocRED incluidos): `NOTICE.md`.
 
+## Resumen para dirección
+
+**Qué es este repositorio.** Es el registro oficial y reproducible de una evaluación: contiene el código de los pipelines y de las métricas, el protocolo, los resultados finales de test y la verificación de reproducibilidad. No contiene experimentación exploratoria.
+
+**Qué se evalúa.** Cuánto mejora la extracción de relaciones de documentos completos (texto → entidades → relaciones) cuando solo hay 10 o 50 documentos anotados, y si un modelo de lenguaje grande (LLM) usado como *juez* sobre los candidatos dudosos del extractor mejora el resultado, tanto en inferencia como para etiquetar documentos nuevos y reentrenar (autoentrenamiento). El extractor es GLiNER-Relex y el benchmark es Re-DocRED.
+
+### Los sistemas y cómo se evalúan
+
+![Esquema de los pipelines evaluados](figures/fig1_pipelines.png)
+
+*Figura 1. A: Z0 (sin entrenar), B0 (ajustado con N documentos) y J0 (B0 con juez LLM sobre los candidatos dudosos). B: autoentrenamiento con pseudo-etiquetas del propio extractor (A3-ctrl, control sin LLM) o del juez (A3).*
+
+![Cómo decide cada sistema según la puntuación del extractor](figures/fig2_banda_juez.png)
+
+*Figura 2. El juez solo interviene en la franja de puntuaciones intermedias; fuera de ella se acepta o se descarta directamente.*
+
+### Cómo se evita la fuga de información
+
+![Uso de los datos: entrenar, seleccionar y evaluar](figures/fig3_protocolo.png)
+
+*Figura 3. Todas las decisiones (checkpoint, umbrales, etiquetas, banda del juez) se toman en 50 documentos de desarrollo; el test de 500 documentos se evalúa una vez con la configuración ya congelada.*
+
+- La métrica principal es el F1 de tripletas **de extremo a extremo**: el sistema predice sus propias entidades y una tripleta solo cuenta si ambas entidades coinciden con las de referencia en menciones y tipo. Se verificó contra el evaluador oficial de Re-DocRED (diferencia 0.00 en siete casos).
+- Los resultados se reportan como media y desviación sobre 5 subconjuntos de entrenamiento y con intervalos de confianza por *bootstrap* pareado por documento.
+- Cada etapa de cálculo se volvió a ejecutar y reproduce los resultados oficiales de forma idéntica (`results/verification/resumen.md`).
+
+### Resultados principales (test, 500 documentos)
+
+![F1 de extremo a extremo por sistema](figures/fig4_resultados.png)
+
+*Figura 4. F1 de extremo a extremo (estricto y con tipo). Barras: media de 5 subconjuntos; barras de error: desviación típica; puntos: cada subconjunto.*
+
+| Comparación | Qué cambia | ΔF1 | IC 95 % | Subconjuntos a favor |
+|---|---|---|---|---|
+| J0 − B0, N = 10 | se añade el juez (mismo extractor) | +2.23 | [1.88, 2.60] | 5 / 5 |
+| J0 − B0, N = 50 | se añade el juez (mismo extractor) | +2.07 | [1.64, 2.52] | 5 / 5 |
+| A3 − A3-ctrl, N = 10 | solo la fuente de las pseudo-etiquetas | +2.42 | [1.99, 2.86] | 5 / 5 |
+
+La ganancia del juez procede del recall (+4.4 con N=10 y +6.0 con N=50); la precisión no cambia con N=10 y baja 1.9 puntos con N=50.
+
+### Qué comparaciones sostienen conclusiones
+
+![Comparaciones controladas y no controladas](figures/fig5_comparaciones.png)
+
+*Figura 5. Solo las comparaciones en que cambia un único factor se usan para atribuir diferencias.*
+
+### Qué se puede y qué no se puede concluir
+
+- **Se puede:** añadir el juez sobre la franja de incertidumbre aumenta el F1 en torno a 2 puntos con N=10 y N=50, de forma consistente en los cinco subconjuntos; y etiquetar con el juez produce un mejor estudiante que etiquetar con el propio extractor (N=10).
+- **No se puede, sin evidencia adicional:** atribuir la mejora a un componente concreto del juez (no hay ablaciones); afirmar que el juez no depende de su conocimiento previo de Wikipedia (el control de memoria es débil); asegurar que las ganancias se mantienen al reentrenar con otras semillas (no se hicieron réplicas); ni generalizar a otros datos, extractores o jueces.
+- **Cifras absolutas:** el F1 (entre 17 y 34) está limitado por la agrupación de entidades por reglas y no es comparable con trabajos que parten de entidades de referencia. Las limitaciones completas están en §8.
+
+### Guía de lectura
+
+| Si quieres saber… | Ve a |
+|---|---|
+| Qué sistemas se comparan y cómo funciona cada uno | §2 |
+| Cómo se evita la fuga de información y cómo se comparan los sistemas | §3 |
+| Qué mide cada métrica y cómo se calcula | §4 |
+| En qué entorno se ejecutó todo | §5 |
+| Las cifras completas, por subconjunto | §6 |
+| Por qué se tomó cada decisión técnica | §7 |
+| Qué no se puede concluir | §8 |
+| Cómo está organizado el repositorio y cómo reproducirlo o auditarlo | §9, §10 y `results/verification/resumen.md` |
+
+
 ## 1. Visión general
 
 **Objetivo.** Medir la extracción de relaciones a nivel de documento de extremo a extremo (texto → entidades → relaciones) con **GLiNER-Relex** cuando solo hay **N = 10** o **N = 50** documentos de entrenamiento etiquetados, y medir el efecto de un **juez LLM** que vuelve a decidir únicamente los candidatos *dudosos* del extractor, así como el de usar ese juez para etiquetar documentos no etiquetados y reentrenar (autoentrenamiento).
@@ -101,6 +167,8 @@ Justificación: el F1 micro y el Ign F1 son las medidas estándar de DocRE (Yao 
 
 ## 6. Resultados finales
 
+(Resumen gráfico en la Figura 4 del resumen inicial.)
+
 Split de test, 500 documentos; F1 = F1 de tripletas de extremo a extremo, estricto y con tipo (%). Media ± desviación típica sobre los 5 subconjuntos de entrenamiento. Fuente: `results/test/*.csv`.
 
 ### 6.1 Z0, B0 y J0
@@ -187,6 +255,7 @@ README.md
 NOTICE.md                    atribución y licencia de los datos de terceros incluidos
 requirements.txt             entorno local (versiones verificadas)
 requirements-modal.txt       dependencias exactas del contenedor de Modal y revisión del modelo base
+figures/                     diagramas y gráficos del README (generados por src/make_figures.py)
 data/
   download.sh                clona Re-DocRED y DocRE-StructuralConsistency en los commits evaluados
   subsets/redocred/          train_N{10,50}_s{0..4}.json — los 10 conjuntos de entrenamiento con pocos datos
@@ -210,6 +279,7 @@ src/
   eval_zs_dev.py, eval_zs_labels.py, eval_zs_labels_fine.py   tablas de selección zero-shot en D
   eval_test.py               métricas de test de B0 y Z0
   compare_dateparser.py      compara las métricas de test recalculadas con dateparser frente a las oficiales
+  make_figures.py            genera los diagramas y los gráficos de figures/ (las cifras se leen de results/test/)
   analyze_test.py            tablas J0 frente a B0 y bootstrap pareado
   a3_pool.py                 pool sin etiquetar de A3 y solapamiento de tripletas con dev/test
   a3_pseudo.py               pseudo-etiquetas de A3-ctrl y A3 y su calidad
@@ -240,6 +310,8 @@ pip install -r requirements.txt
 mkdir -p runs && cp -r results/test runs/test        # el código escribe en runs/, nunca en results/
 python src/analyze_test.py                            # regenera A1_A2_summary.csv y A1_A2_bootstrap.csv en runs/test
 ```
+
+**Regenerar los diagramas y gráficos del README** (lee `results/test/`; requiere `matplotlib`): `python src/make_figures.py` (escribe en `figures/`).
 
 **Comparar el efecto de `dateparser`** (tras recalcular con él en `runs/test`): `python src/compare_dateparser.py`.
 
